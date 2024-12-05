@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test22-microservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: test22-microservice
+  template:
+    metadata:
+      labels:
+        app: test22-microservice
+    spec:
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            app: test22-microservice
+      nodeSelector:
+        "kubernetes.io/os": linux
+      automountServiceAccountToken: false
+      containers:
+      - name: test22-microservice
+        image: test22-microservice:#{BuildRef}#
+        imagePullPolicy: Never
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        ports:
+        - containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /healthz/live
+            port: 8080
+          periodSeconds: 60
+          timeoutSeconds: 30
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8080
+          periodSeconds: 60
+          timeoutSeconds: 30
+          failureThreshold: 3
+        volumeMounts:
+        - name: appsettings-volume
+          mountPath: /app/appsettings.Development.json
+          subPath: appsettings.Development.json
+        resources:
+          requests:
+            cpu: 50m
+            memory: 512Mi
+            ephemeral-storage: "2Gi"
+          limits:
+            memory: 512Mi
+            ephemeral-storage: "2Gi"
+      volumes:
+      - name: appsettings-volume
+        configMap:
+          name: test22-configmap
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: test22-microservice
+spec:
+  selector:
+    app: test22-microservice
+  type: NodePort
+  ports:
+  - port: 8080
+
